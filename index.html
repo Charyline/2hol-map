@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2HOL Town Map</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>2HOL Town Map</h1>
+      <span class="subtitle">Community bell-locator for Two Hours One Life</span>
+    </div>
+    <nav class="nav">
+      <button id="btn-map" class="nav-btn active" data-view="map">Map</button>
+      <button id="btn-list" class="nav-btn" data-view="list">Town List</button>
+      <button id="btn-my" class="nav-btn hidden" data-view="my">My Towns</button>
+      <button id="btn-admin" class="nav-btn" data-view="admin">Admin</button>
+      <a class="nav-btn discord" href="https://discord.gg/atEgxm7" target="_blank" rel="noopener">Discord</a>
+      <div id="auth-area" class="auth-area">
+        <button id="btn-login" class="nav-btn login-btn">Login with Discord</button>
+        <div id="user-menu" class="user-menu hidden">
+          <img id="user-avatar" class="avatar" alt="">
+          <span id="user-name"></span>
+          <button id="btn-logout" class="nav-btn">Logout</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- MAP VIEW -->
+    <section id="view-map" class="view active">
+      <div id="chart"></div>
+      <aside id="form-panel" class="panel">
+        <div class="panel-header">
+          <h2>Report a Town</h2>
+          <button id="toggle-form" class="icon-btn" title="Collapse">▾</button>
+        </div>
+        <form id="bellreport" class="form-body">
+          <p class="hint">Heard a town bell in-game? Enter the HETUW coordinates and which known town rang it. Logged-in users can set icon, visibility and claim ownership.</p>
+          
+          <label>
+            Your Town's Name
+            <input type="text" id="rtown" placeholder="e.g. Avalon" required maxlength="60" autocomplete="off">
+          </label>
+          
+          <label>
+            Bell you heard (reference)
+            <select id="stown" required>
+              <option value="" selected disabled>Select a known town…</option>
+            </select>
+          </label>
+          
+          <div class="coord-row">
+            <label>
+              First Coord
+              <input type="number" id="xcoord" placeholder="e.g. 12073" required step="1">
+            </label>
+            <label>
+              Second Coord
+              <input type="number" id="ycoord" placeholder="e.g. -5090" required step="1">
+            </label>
+          </div>
+          
+          <label>
+            Your Username <span class="opt">(optional)</span>
+            <input type="text" id="user" placeholder="Anonymous" maxlength="40" autocomplete="username">
+          </label>
+          
+          <label>
+            Short Description <span class="opt">(optional)</span>
+            <input type="text" id="desc" placeholder="e.g. Near river, good clay" maxlength="120">
+          </label>
+
+          <div class="extra-fields" id="owner-fields">
+            <label>
+              Icon / Type
+              <select id="icon">
+                <option value="default">Default (circle)</option>
+                <option value="star">Star</option>
+                <option value="tree">Tree / Nature</option>
+                <option value="tobacco">Tobacco</option>
+                <option value="christmas">Christmas / Holiday</option>
+                <option value="event">Event</option>
+                <option value="outpost">Road / Outpost</option>
+                <option value="special">Special</option>
+              </select>
+            </label>
+            <label>
+              Visibility
+              <select id="visibility">
+                <option value="public">Public (everyone)</option>
+                <option value="members">Members (logged-in)</option>
+                <option value="vets">Vets &amp; higher</option>
+                <option value="private">Private (only owners / admins)</option>
+              </select>
+            </label>
+          </div>
+          
+          <div id="name-warning" class="warning hidden"></div>
+          
+          <button type="submit" class="primary-btn">Add / Update Town on Map</button>
+          <p class="tiny">Open &amp; democratic — anyone can report. Owners &amp; admins can edit later.</p>
+        </form>
+      </aside>
+      
+      <div id="town-detail" class="detail-card hidden">
+        <button class="close-detail">×</button>
+        <h3 id="detail-name"></h3>
+        <div id="detail-body"></div>
+        <div id="detail-actions" class="detail-actions hidden">
+          <button id="btn-edit-town" class="secondary-btn">Edit Town</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- LIST VIEW -->
+    <section id="view-list" class="view">
+      <div class="list-controls">
+        <input type="search" id="search-towns" placeholder="Search towns…">
+        <select id="sort-towns">
+          <option value="name">Sort by Name</option>
+          <option value="reports">Sort by # Reports</option>
+          <option value="x">Sort by X</option>
+          <option value="y">Sort by Y</option>
+          <option value="type">Sort by Type</option>
+        </select>
+        <span id="list-count" class="count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="towns-table">
+          <thead>
+            <tr>
+              <th>Town</th>
+              <th>Type</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>Reports</th>
+              <th>Visibility</th>
+              <th>Owner</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MY TOWNS VIEW -->
+    <section id="view-my" class="view">
+      <div class="list-controls">
+        <h2 style="font-size:1rem;margin:0">Your claimed towns</h2>
+        <span id="my-count" class="count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="my-towns-table">
+          <thead>
+            <tr>
+              <th>Town</th>
+              <th>Type</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>Visibility</th>
+              <th>Reports</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint" style="padding:1rem">You can edit name, coordinates (by submitting a fresh public-town relative report), icon, visibility and description. Position is still the median of all reports for that name.</p>
+    </section>
+
+    <!-- ADMIN VIEW -->
+    <section id="view-admin" class="view">
+      <div id="admin-denied" class="admin-box">
+        <h2>Admin Access</h2>
+        <p>Admins are whitelisted by Discord ID in Firebase.</p>
+        <p class="tiny">Path: <code>/admins/{yourDiscordId} = true</code></p>
+        <p class="tiny" id="admin-denied-hint">Log in with Discord first. If you are already logged in and still see this, your ID is not on the list.</p>
+      </div>
+      
+      <div id="admin-panel" class="hidden">
+        <div class="admin-header">
+          <h2>Admin Panel</h2>
+          <button id="recompute-btn" class="secondary-btn">Force Recompute Map</button>
+        </div>
+        <p class="hint">Raw reports from Firebase. Flagged rows are suggestions only — delete the ones that look wrong. Position on the map is the <strong>median</strong> of all reports sharing a town name.</p>
+        <div class="admin-legend">
+          <span><span class="flag-badge dup">dup</span> exact same coords already reported for this town</span>
+          <span><span class="flag-badge mirror">mirror</span> looks like a sign-flip of another report</span>
+          <span><span class="flag-badge spam">spam</span> test / placeholder name</span>
+          <span><span class="flag-badge orphan">orphan</span> relative to a town that never resolved</span>
+          <span><span class="flag-badge extreme">extreme</span> coords far outside the main cluster</span>
+        </div>
+        <div class="list-controls">
+          <input type="search" id="search-reports" placeholder="Filter reports by town or user…">
+          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="filter-problems"> Problems only
+          </label>
+          <span id="report-count" class="count"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="reports-table">
+            <thead>
+              <tr>
+                <th>Flags</th>
+                <th>Town (recv)</th>
+                <th>Heard (send)</th>
+                <th>X</th>
+                <th>Y</th>
+                <th>User</th>
+                <th>Key</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Edit Town</h2>
+      <form id="edit-form">
+        <input type="hidden" id="edit-original-name">
+        <label>
+          Town Name
+          <input type="text" id="edit-name" required maxlength="60">
+        </label>
+        <div class="coord-row">
+          <label>
+            Absolute X <span class="opt">(map coords)</span>
+            <input type="number" id="edit-x" step="1">
+          </label>
+          <label>
+            Absolute Y
+            <input type="number" id="edit-y" step="1">
+          </label>
+        </div>
+        <p class="tiny">Edits update town metadata in place (icon, visibility, name, description). Fill X/Y only if you want to set an absolute map position override. No new report is added unless you change coordinates.</p>
+        <label>
+          Icon / Type
+          <select id="edit-icon">
+            <option value="default">Default</option>
+            <option value="star">Star</option>
+            <option value="tree">Tree / Nature</option>
+            <option value="tobacco">Tobacco</option>
+            <option value="christmas">Christmas / Holiday</option>
+            <option value="event">Event</option>
+            <option value="outpost">Road / Outpost</option>
+            <option value="special">Special</option>
+          </select>
+        </label>
+        <label>
+          Visibility
+          <select id="edit-visibility">
+            <option value="public">Public</option>
+            <option value="members">Members</option>
+            <option value="vets">Vets &amp; higher</option>
+            <option value="private">Private</option>
+          </select>
+        </label>
+        <label>
+          Description
+          <input type="text" id="edit-desc" maxlength="120">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="edit-cancel" class="secondary-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>Data open via Firebase · Built for the 2HOL community · <a href="https://twohoursonelife.com" target="_blank">twohoursonelife.com</a></span>
+  </footer>
+
+  <!-- Libraries -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
