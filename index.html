@@ -18,6 +18,7 @@
       <button id="btn-map" class="nav-btn active" data-view="map">Map</button>
       <button id="btn-list" class="nav-btn" data-view="list">Town List</button>
       <button id="btn-my" class="nav-btn hidden" data-view="my">My Towns</button>
+      <button id="btn-report" class="nav-btn hidden" data-view="report">Report a Town</button>
       <button id="btn-admin" class="nav-btn" data-view="admin">Admin</button>
       <a class="nav-btn discord" href="https://discord.gg/atEgxm7" target="_blank" rel="noopener">Discord</a>
       <div id="auth-area" class="auth-area">
@@ -35,78 +36,6 @@
     <!-- MAP VIEW -->
     <section id="view-map" class="view active">
       <div id="chart"></div>
-      <aside id="form-panel" class="panel">
-        <div class="panel-header">
-          <h2>Report a Town</h2>
-          <button id="toggle-form" class="icon-btn" title="Collapse">▾</button>
-        </div>
-        <form id="bellreport" class="form-body">
-          <p class="hint">Heard a town bell in-game? Enter the HETUW coordinates and which known town rang it. Logged-in users can set icon, visibility and claim ownership.</p>
-          
-          <label>
-            Your Town's Name
-            <input type="text" id="rtown" placeholder="e.g. Avalon" required maxlength="60" autocomplete="off">
-          </label>
-          
-          <label>
-            Bell you heard (reference)
-            <select id="stown" required>
-              <option value="" selected disabled>Select a known town…</option>
-            </select>
-          </label>
-          
-          <div class="coord-row">
-            <label>
-              First Coord
-              <input type="number" id="xcoord" placeholder="e.g. 12073" required step="1">
-            </label>
-            <label>
-              Second Coord
-              <input type="number" id="ycoord" placeholder="e.g. -5090" required step="1">
-            </label>
-          </div>
-          
-          <label>
-            Your Username <span class="opt">(optional)</span>
-            <input type="text" id="user" placeholder="Anonymous" maxlength="40" autocomplete="username">
-          </label>
-          
-          <label>
-            Short Description <span class="opt">(optional)</span>
-            <input type="text" id="desc" placeholder="e.g. Near river, good clay" maxlength="120">
-          </label>
-
-          <div class="extra-fields" id="owner-fields">
-            <label>
-              Icon / Type
-              <select id="icon">
-                <option value="default">Default (circle)</option>
-                <option value="star">Star</option>
-                <option value="tree">Tree / Nature</option>
-                <option value="tobacco">Tobacco</option>
-                <option value="christmas">Christmas / Holiday</option>
-                <option value="event">Event</option>
-                <option value="outpost">Road / Outpost</option>
-                <option value="special">Special</option>
-              </select>
-            </label>
-            <label>
-              Visibility
-              <select id="visibility">
-                <option value="public">Public (everyone)</option>
-                <option value="members">Members (logged-in)</option>
-                <option value="vets">Vets &amp; higher</option>
-                <option value="private">Private (only owners / admins)</option>
-              </select>
-            </label>
-          </div>
-          
-          <div id="name-warning" class="warning hidden"></div>
-          
-          <button type="submit" class="primary-btn">Add / Update Town on Map</button>
-          <p class="tiny">Open &amp; democratic — anyone can report. Owners &amp; admins can edit later.</p>
-        </form>
-      </aside>
       
       <div id="town-detail" class="detail-card hidden">
         <button class="close-detail">×</button>
@@ -173,6 +102,75 @@
         </table>
       </div>
       <p class="hint" style="padding:1rem">You can edit name, coordinates (by submitting a fresh public-town relative report), icon, visibility and description. Position is still the median of all reports for that name.</p>
+    </section>
+    
+    <section id="view-report" class="view">
+      <form id="bellreport" class="form-body">
+        <p class="hint">In game, click on the coordinates of the town bell you are using as a reference to show their precise value, and enter them here with the signs you see.</p>
+        
+        <label>
+          Your Town's Name
+          <input type="text" id="rtown" placeholder="e.g. Avalon" required maxlength="60" autocomplete="off">
+        </label>
+        
+        <label>
+          Bell you heard (reference)
+          <select id="stown" required>
+            <option value="" selected disabled>Select a known town…</option>
+          </select>
+        </label>
+        
+        <div class="coord-row">
+          <label>
+            First Coord
+            <input type="number" id="xcoord" placeholder="e.g. 12073" required step="1">
+          </label>
+          <label>
+            Second Coord
+            <input type="number" id="ycoord" placeholder="e.g. -5090" required step="1">
+          </label>
+        </div>
+        
+        <label>
+          Owner <span class="opt">(optional)</span>
+          <input type="text" id="user" placeholder="Anonymous" maxlength="40" autocomplete="username">
+        </label>
+        
+        <label>
+          Short Description <span class="opt">(optional)</span>
+          <input type="text" id="desc" placeholder="e.g. Near river, good clay" maxlength="120">
+        </label>
+
+        <div class="extra-fields" id="owner-fields">
+          <label>
+            Icon / Type
+            <select id="icon">
+              <option value="default">Default (circle)</option>
+              <option value="star">Star</option>
+              <option value="tree">Tree / Nature</option>
+              <option value="tobacco">Tobacco</option>
+              <option value="christmas">Christmas / Holiday</option>
+              <option value="event">Event</option>
+              <option value="outpost">Road / Outpost</option>
+              <option value="special">Special</option>
+            </select>
+          </label>
+          <label>
+            Visibility
+            <select id="visibility">
+              <option value="public">Public (everyone)</option>
+              <option value="members">Members (logged-in)</option>
+              <option value="vets">Vets &amp; higher</option>
+              <option value="private">Private (only owners / admins)</option>
+            </select>
+          </label>
+        </div>
+        
+        <div id="name-warning" class="warning hidden"></div>
+        
+        <button type="submit" class="primary-btn">Add Town on Map</button>
+        <p class="tiny">Open &amp; democratic — anyone can report. Owners &amp; admins can edit later.</p>
+      </form>
     </section>
 
     <!-- ADMIN VIEW -->
@@ -245,7 +243,7 @@
             <input type="number" id="edit-y" step="1">
           </label>
         </div>
-        <p class="tiny">Edits update town metadata in place (icon, visibility, name, description). Fill X/Y only if you want to set an absolute map position override. No new report is added unless you change coordinates.</p>
+        <p class="tiny">Fill X/Y only if you want to change the current coordinates.</p>
         <label>
           Icon / Type
           <select id="edit-icon">
