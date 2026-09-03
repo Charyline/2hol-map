@@ -600,6 +600,7 @@ tr.flag-extreme { background: rgba(236, 72, 153, 0.12); }
 
 /* Auth */
 .auth-area {
+  padding-bottom: 5px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
