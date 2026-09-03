@@ -59,6 +59,11 @@ body {
   letter-spacing: -0.02em;
 }
 
+.brand h1 a {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .subtitle {
   font-size: 0.75rem;
   color: var(--muted);
