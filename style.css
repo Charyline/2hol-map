@@ -307,10 +307,10 @@ select:focus {
   font-size: 0.8rem;
 }
 
-/* .warning.hidden,
+.warning.hidden,
 .hidden {
   display: none !important;
-} */
+}
 
 /* Detail card */
 .detail-card {
