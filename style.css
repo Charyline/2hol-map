@@ -73,7 +73,24 @@ body {
 .nav {
   display: flex;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  flex-grow: 1;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  max-width: 100%;
+  order: 0;
+}
+
+.nav::-webkit-scrollbar {
+  height: 5px;
+}
+
+.nav::-webkit-scrollbar * {
+  background: transparent;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 
 .nav-btn {
