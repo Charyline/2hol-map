@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
   <header class="topbar">
     <div class="brand">
-      <h1>2HOL Town Map</h1>
-      <span class="subtitle">Community bell-locator for Two Hours One Life</span>
+      <h1><a href="https://twohoursonelife.com">2HOL Town Map</a></h1>
+      <span class="subtitle">Community bell-locator for Two Hours One Life</span>
     </div>
     <nav class="nav">
       <button id="btn-map" class="nav-btn active" data-view="map">Map</button>
@@ -20,23 +22,23 @@
       <button id="btn-my" class="nav-btn hidden" data-view="my">My Towns</button>
       <button id="btn-report" class="nav-btn hidden" data-view="report">Report a Town</button>
       <button id="btn-admin" class="nav-btn" data-view="admin">Admin</button>
-      <a class="nav-btn discord" href="https://discord.gg/atEgxm7" target="_blank" rel="noopener">Discord</a>
-      <div id="auth-area" class="auth-area">
-        <button id="btn-login" class="nav-btn login-btn">Login with Discord</button>
-        <div id="user-menu" class="user-menu hidden">
-          <img id="user-avatar" class="avatar" alt="">
-          <span id="user-name"></span>
-          <button id="btn-logout" class="nav-btn">Logout</button>
-        </div>
-      </div>
+      <!-- <a class="nav-btn discord" href="https://discord.gg/atEgxm7" target="_blank" rel="noopener">Discord</a> -->
     </nav>
+    <div id="auth-area" class="auth-area">
+      <button id="btn-login" class="nav-btn login-btn">Login with Discord</button>
+      <div id="user-menu" class="user-menu hidden">
+        <img id="user-avatar" class="avatar" alt="">
+        <span id="user-name"></span>
+        <button id="btn-logout" class="nav-btn">Logout</button>
+      </div>
+    </div>
   </header>
 
   <main>
     <!-- MAP VIEW -->
     <section id="view-map" class="view active">
       <div id="chart"></div>
-      
+
       <div id="town-detail" class="detail-card hidden">
         <button class="close-detail">×</button>
         <h3 id="detail-name"></h3>
@@ -101,25 +103,27 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="hint" style="padding:1rem">You can edit name, coordinates (by submitting a fresh public-town relative report), icon, visibility and description. Position is still the median of all reports for that name.</p>
+      <p class="hint" style="padding:1rem">You can edit name, coordinates (by submitting a fresh public-town relative
+        report), icon, visibility and description. Position is still the median of all reports for that name.</p>
     </section>
-    
+
     <section id="view-report" class="view">
       <form id="bellreport" class="form-body">
-        <p class="hint">In game, click on the coordinates of the town bell you are using as a reference to show their precise value, and enter them here with the signs you see.</p>
-        
+        <p class="hint">In game, click on the coordinates of the town bell you are using as a reference to show their
+          precise value, and enter them here with the signs you see.</p>
+
         <label>
           Your Town's Name
           <input type="text" id="rtown" placeholder="e.g. Avalon" required maxlength="60" autocomplete="off">
         </label>
-        
+
         <label>
           Bell you heard (reference)
           <select id="stown" required>
             <option value="" selected disabled>Select a known town…</option>
           </select>
         </label>
-        
+
         <div class="coord-row">
           <label>
             First Coord
@@ -130,12 +134,12 @@
             <input type="number" id="ycoord" placeholder="e.g. -5090" required step="1">
           </label>
         </div>
-        
+
         <label>
           Owner <span class="opt">(optional)</span>
           <input type="text" id="user" placeholder="Anonymous" maxlength="40" autocomplete="username">
         </label>
-        
+
         <label>
           Short Description <span class="opt">(optional)</span>
           <input type="text" id="desc" placeholder="e.g. Near river, good clay" maxlength="120">
@@ -165,9 +169,9 @@
             </select>
           </label>
         </div>
-        
+
         <div id="name-warning" class="warning hidden"></div>
-        
+
         <button type="submit" class="primary-btn">Add Town on Map</button>
         <p class="tiny">Open &amp; democratic — anyone can report. Owners &amp; admins can edit later.</p>
       </form>
@@ -179,15 +183,17 @@
         <h2>Admin Access</h2>
         <p>Admins are whitelisted by Discord ID in Firebase.</p>
         <p class="tiny">Path: <code>/admins/{yourDiscordId} = true</code></p>
-        <p class="tiny" id="admin-denied-hint">Log in with Discord first. If you are already logged in and still see this, your ID is not on the list.</p>
+        <p class="tiny" id="admin-denied-hint">Log in with Discord first. If you are already logged in and still see
+          this, your ID is not on the list.</p>
       </div>
-      
+
       <div id="admin-panel" class="hidden">
         <div class="admin-header">
           <h2>Admin Panel</h2>
           <button id="recompute-btn" class="secondary-btn">Force Recompute Map</button>
         </div>
-        <p class="hint">Raw reports from Firebase. Flagged rows are suggestions only — delete the ones that look wrong. Position on the map is the <strong>median</strong> of all reports sharing a town name.</p>
+        <p class="hint">Raw reports from Firebase. Flagged rows are suggestions only — delete the ones that look wrong.
+          Position on the map is the <strong>median</strong> of all reports sharing a town name.</p>
         <div class="admin-legend">
           <span><span class="flag-badge dup">dup</span> exact same coords already reported for this town</span>
           <span><span class="flag-badge mirror">mirror</span> looks like a sign-flip of another report</span>
@@ -279,7 +285,8 @@
   </div>
 
   <footer class="footer">
-    <span>Data open via Firebase · Built for the 2HOL community · <a href="https://twohoursonelife.com" target="_blank">twohoursonelife.com</a></span>
+    <span>Data open via Firebase · Built for the 2HOL community · <a href="https://twohoursonelife.com"
+        target="_blank">twohoursonelife.com</a></span>
   </footer>
 
   <!-- Libraries -->
@@ -289,4 +296,5 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <script src="./script.js"></script>
 </body>
+
 </html>
