@@ -763,8 +763,10 @@ async function handleDiscordCallback() {
     const me = JSON.parse(json);
     let roles = me.roles || me.roleIds || [];
     let level = levelFromRoles(roles);
-
     try {
+      if (me.firebaseToken && firebase.auth) {
+        await firebase.auth().signInWithCustomToken(me.firebaseToken);
+      } 
       const snap = await firebase.database().ref(`/discordRoles/${me.id}`).once("value");
       const stored = snap.val();
       if (stored && Array.isArray(stored.roles)) {
