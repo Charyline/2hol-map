@@ -273,7 +273,14 @@ function drawChart(townMap) {
       gridcolor: "#1f2937", tickfont: { size: 11 }
     },
     showlegend: true,
-    legend: { bgcolor: "rgba(26,35,50,0.8)", bordercolor: "#2d3a4f", font: { size: 11 } },
+    legend: {
+      bgcolor: "rgba(0,0,0,0)",
+      bordercolor: "#2d3a4f",
+      font: { size: 11 },
+      x: 1,
+      y: 1,
+      xanchor: 'right'
+    },
     hovermode: "closest", dragmode: "pan"
   };
 
