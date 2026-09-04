@@ -192,8 +192,7 @@
           <h2>Admin Panel</h2>
           <button id="recompute-btn" class="secondary-btn">Force Recompute Map</button>
         </div>
-        <p class="hint">Raw reports from Firebase. Flagged rows are suggestions only — delete the ones that look wrong.
-          Position on the map is the <strong>median</strong> of all reports sharing a town name.</p>
+        <p class="hint">These are the towns on the map. Delete removes the town <strong>and</strong> its confirmation reports. Public town cannot be deleted.</p>
         <div class="admin-legend">
           <span><span class="flag-badge dup">dup</span> exact same coords already reported for this town</span>
           <span><span class="flag-badge mirror">mirror</span> looks like a sign-flip of another report</span>
@@ -202,7 +201,7 @@
           <span><span class="flag-badge extreme">extreme</span> coords far outside the main cluster</span>
         </div>
         <div class="list-controls">
-          <input type="search" id="search-reports" placeholder="Filter reports by town or user…">
+          <input type="search" id="search-reports" placeholder="Filter towns by name or owner…">
           <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--muted);cursor:pointer">
             <input type="checkbox" id="filter-problems"> Problems only
           </label>
@@ -212,13 +211,12 @@
           <table id="reports-table">
             <thead>
               <tr>
-                <th>Flags</th>
-                <th>Town (recv)</th>
-                <th>Heard (send)</th>
+                <th>Name</th>
                 <th>X</th>
                 <th>Y</th>
-                <th>User</th>
-                <th>Key</th>
+                <th>Owner</th>
+                <th>Reports</th>
+                <th>Id</th>
                 <th></th>
               </tr>
             </thead>
