@@ -539,15 +539,17 @@ async function deleteTown(id) {
     // The map is drawn from /towns/{id}. Removing only a /reports row
     // updates lists that read reports, but leaves the dot in place.
     await townRef.child(id).remove();
-    const reps = rawReports || {};
-    await Promise.all(Object.keys(reps)
-      .filter(k => reps[k] && (reps[k].townId === id || reps[k].townName === t.name))
-      .map(k => reportRef.child(k).remove()));
     delete rawTowns[id];
     delete towns[id];
     const detail = document.getElementById("town-detail");
     if (detail) detail.classList.add("hidden");
     processAndRender();
+    const reps = rawReports || {};
+    const leftovers = Object.keys(reps)
+      .filter(k => reps[k] && (reps[k].townId === id || reps[k].townName === t.name));
+    for (const k of leftovers) {
+      try { await reportRef.child(k).remove(); } catch (_) { /* owners cannot delete others' reports */ }
+    }
   } catch (err) {
     alert("Delete failed: " + err.message);
   }
