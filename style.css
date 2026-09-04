@@ -249,19 +249,18 @@ select {
   transition: border-color 0.15s;
 }
 
-.coord-cont {
-  max-width: 50%;
-}
-
 input:focus,
 select:focus {
   border-color: var(--accent);
 }
 
+.coord-cont {
+  max-width: 45%;
+}
+
 .coord-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
+  display: flex;
+  justify-content: space-between;
 }
 
 .primary-btn,
