@@ -38,12 +38,16 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const townRef = firebase.database().ref("/towns");
-const metaRef = firebase.database().ref("/townMeta");
+const reportRef = firebase.database().ref("/reports");
+
+const MERGE_DIST = 2500; // same name + this close → same town id
+const PUBLIC_ID = "public";
 
 // ---------- State ----------
-let rawData = {};
-let townMeta = {};   // name -> { icon, visibility, desc, ownerId, ownerName, overrideX?, overrideY? }
-let towns = {};
+let rawTowns = {};     // /towns entities {id: {name,x,y,...}}
+let rawReports = {};   // /reports pings
+let rawData = {};      // alias used by admin table (reports)
+let towns = {};        // computed map keyed by town id
 let isAdmin = false;
 let chartReady = false;
 let currentUser = null;   // { id, username, discriminator, avatar, roles: string[], level: number }
@@ -80,196 +84,129 @@ function canSee(town) {
 }
 
 function canEdit(town) {
+  if (!town || town.id === PUBLIC_ID || town.name === "public town") return isAdmin;
   if (isAdmin) return true;
   if (!currentUser) return false;
-  // Owners can always edit; unowned towns can be claimed by anyone logged in
-  if (!town.owners || town.owners.length === 0) return true;
-  return town.owners.includes(currentUser.id);
+  if (town.ownerId && town.ownerId === currentUser.id) return true;
+  if (town.owners && town.owners.includes(currentUser.id)) return true;
+  return false;
 }
 
-// ---------- Compute towns (extended with meta) ----------
-function metaKey(name) {
-  // Firebase path-safe key for a town name
-  return String(name || "").trim().replace(/[.#$[\]]/g, "_");
+function requireAuth() {
+  const uid = firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid;
+  if (!uid || !currentUser) {
+    alert("Log in with Discord before adding or editing towns.");
+    return null;
+  }
+  return uid;
 }
 
-function computeTowns(tdata, meta) {
-  meta = meta || {};
-  const reports = [];
-  const byName = {};
-
-  Object.keys(tdata || {}).forEach(key => {
-    const tmp = tdata[key];
-    if (!tmp || !tmp.recv || !tmp.send) return;
-
-    let townName, otherName;
-    if (tmp.recv.type === "new") {
-      townName = tmp.recv.name;
-      otherName = tmp.send.name;
-    } else if (tmp.send.type === "new") {
-      townName = tmp.send.name;
-      otherName = tmp.recv.name;
-    } else {
-      townName = tmp.recv.name;
-      otherName = tmp.send.name;
-    }
-    if (!townName) return;
-
-    reports.push({
-      key,
-      townName: String(townName).trim(),
-      otherName: String(otherName || "").trim(),
-      x: parseCoord(tmp.x),
-      y: parseCoord(tmp.y),
-      user: sanitize(tmp.user || ""),
-      desc: sanitize(tmp.desc || ""),
-      ownerId: tmp.ownerId || null,
-      ownerName: sanitize(tmp.ownerName || ""),
-      icon: tmp.icon || "default",
-      visibility: tmp.visibility || "public",
-      type: tmp.type || tmp.icon || "default",
-      raw: tmp
-    });
-  });
-
-  const known = { "public town": { x: 0, y: 0 } };
-  const pending = reports.filter(r => r.townName !== "public town");
-  let progress = true, safety = 0;
-
-  while (progress && safety < 50) {
-    progress = false;
-    safety++;
-    for (let i = pending.length - 1; i >= 0; i--) {
-      const r = pending[i];
-      if (!known[r.otherName]) continue;
-
-      const src = known[r.otherName];
-      let absX, absY;
-      if (r.otherName === "public town") {
-        absX = r.x;
-        absY = r.y;
-      } else {
-        absX = r.x - src.x;
-        absY = r.y - src.y;
-      }
-
-      if (!byName[r.townName]) byName[r.townName] = [];
-      byName[r.townName].push({
-        x: absX, y: absY,
-        key: r.key, user: r.user, desc: r.desc,
-        ownerId: r.ownerId, ownerName: r.ownerName,
-        icon: r.icon, visibility: r.visibility, type: r.type,
-        ref: r.otherName
-      });
-
-      if (!known[r.townName]) known[r.townName] = { x: absX, y: absY };
-      pending.splice(i, 1);
-      progress = true;
+// ---------- Compute towns (id-keyed entities) ----------
+function normalizeTown(id, rec, reportList) {
+  const name = sanitize(rec.name || id);
+  const reps = reportList || [];
+  let x = rec.x, y = rec.y;
+  if (typeof x !== "number") x = parseCoord(x);
+  if (typeof y !== "number") y = parseCoord(y);
+  if ((x === 0 && y === 0 && id !== PUBLIC_ID) || (rec.x == null && rec.y == null)) {
+    if (reps.length) {
+      x = Math.round(median(reps.map(r => r.absX)));
+      y = Math.round(median(reps.map(r => r.absY)));
     }
   }
+  const owners = [];
+  if (rec.ownerId) owners.push(rec.ownerId);
+  const ownerNames = [];
+  if (rec.ownerName) ownerNames.push(rec.ownerName);
+  return {
+    id,
+    name,
+    x, y,
+    icon: rec.icon || "default",
+    visibility: rec.visibility || "public",
+    type: rec.icon || "default",
+    desc: rec.desc || "",
+    descs: rec.desc ? [rec.desc] : [],
+    ownerId: rec.ownerId || null,
+    owners,
+    ownerNames,
+    reports: reps.length,
+    reporters: reps.map(r => r.user).filter(Boolean),
+    keys: reps.map(r => r.key),
+    uncertain: false,
+    maxDev: 0
+  };
+}
 
-  byName["public town"] = [{
-    x: 0, y: 0, key: null, user: "system", desc: "Spawn / origin",
-    ownerId: null, icon: "star", visibility: "public", type: "default"
-  }];
-
+function computeTowns(townEntities, reports) {
   const result = {};
-  Object.keys(byName).forEach(name => {
-    const list = byName[name];
-    const xs = list.map(p => p.x);
-    const ys = list.map(p => p.y);
-    let mx = Math.round(median(xs));
-    let my = Math.round(median(ys));
-    let maxDev = Math.max(...xs.map(x => Math.abs(x - mx)), ...ys.map(y => Math.abs(y - my)), 0);
-
-    // Prefer most recent non-default meta
-    let icon = "default", visibility = "public", type = "default";
-    const owners = new Set();
-    let descs = [];
-    list.forEach(p => {
-      if (p.ownerId) owners.add(p.ownerId);
-      if (p.desc) descs.push(p.desc);
-      if (p.icon && p.icon !== "default") icon = p.icon;
-      if (p.visibility && p.visibility !== "public") visibility = p.visibility;
-      if (p.type && p.type !== "default") type = p.type;
+  const byTown = {};
+  Object.keys(reports || {}).forEach(key => {
+    const r = reports[key];
+    if (!r) return;
+    const tid = r.townId;
+    if (!tid) return;
+    if (!byTown[tid]) byTown[tid] = [];
+    byTown[tid].push({
+      key,
+      absX: typeof r.absX === "number" ? r.absX : parseCoord(r.absX),
+      absY: typeof r.absY === "number" ? r.absY : parseCoord(r.absY)
     });
-    // last report wins for meta if present
-    const last = list[list.length - 1];
-    if (last) {
-      if (last.icon) icon = last.icon;
-      if (last.visibility) visibility = last.visibility;
-      if (last.type) type = last.type;
-    }
-
-    // Overlay /townMeta if present (true edits live here)
-    const m = meta[name] || meta[metaKey(name)];
-    if (m) {
-      if (m.icon) { icon = m.icon; type = m.icon; }
-      if (m.visibility) visibility = m.visibility;
-      if (m.desc) descs = [m.desc, ...descs.filter(d => d !== m.desc)];
-      if (m.ownerId) owners.add(m.ownerId);
-      if (m.ownerName) { /* collected below */ }
-      if (typeof m.overrideX === "number" && typeof m.overrideY === "number") {
-        mx = Math.round(m.overrideX);
-        my = Math.round(m.overrideY);
-        maxDev = 0; // explicit override
-      }
-    }
-
-    const ownerNames = new Set(list.map(p => p.ownerName).filter(Boolean));
-    if (m && m.ownerName) ownerNames.add(m.ownerName);
-
-    result[name] = {
-      name, x: mx, y: my,
-      reports: list.length,
-      reporters: [...new Set(list.map(p => p.user))],
-      keys: list.map(p => p.key).filter(Boolean),
-      descs,
-      owners: [...owners],
-      ownerNames: [...ownerNames],
-      icon, visibility, type,
-      uncertain: maxDev > 2500,
-      maxDev,
-      hasMeta: !!m
-    };
   });
 
-  // Towns that exist only in meta (e.g. renamed) with absolute override
-  Object.keys(meta).forEach(key => {
-    const m = meta[key];
-    const name = m.name || key;
-    if (result[name]) return;
-    if (typeof m.overrideX !== "number" || typeof m.overrideY !== "number") return;
-    result[name] = {
-      name,
-      x: Math.round(m.overrideX),
-      y: Math.round(m.overrideY),
-      reports: 0,
-      reporters: [],
-      keys: [],
-      descs: m.desc ? [m.desc] : [],
-      owners: m.ownerId ? [m.ownerId] : [],
-      ownerNames: m.ownerName ? [m.ownerName] : [],
-      icon: m.icon || "default",
-      visibility: m.visibility || "public",
-      type: m.icon || "default",
-      uncertain: false,
-      maxDev: 0,
-      hasMeta: true
-    };
+  Object.keys(townEntities || {}).forEach(id => {
+    const rec = townEntities[id];
+    if (!rec || rec.recv || rec.send) return; // skip leftover pre-wipe report-shaped rows
+    result[id] = normalizeTown(id, rec, byTown[id]);
   });
 
+  if (!result[PUBLIC_ID]) {
+    result[PUBLIC_ID] = normalizeTown(PUBLIC_ID, {
+      name: "public town", x: 0, y: 0, icon: "star", visibility: "public"
+    }, []);
+  }
+  result[PUBLIC_ID].x = 0;
+  result[PUBLIC_ID].y = 0;
   return result;
+}
+
+function findNearbySameName(name, x, y) {
+  const want = name.trim().toLowerCase();
+  let best = null, bestD = Infinity;
+  Object.values(towns).forEach(t => {
+    if (!t || t.id === PUBLIC_ID) return;
+    if ((t.name || "").trim().toLowerCase() !== want) return;
+    const d = Math.hypot((t.x || 0) - x, (t.y || 0) - y);
+    if (d < bestD) { bestD = d; best = t; }
+  });
+  if (best && bestD <= MERGE_DIST) return best;
+  return null;
+}
+
+function resolveFromHeard(heardId, rawX, rawY) {
+  const heard = towns[heardId] || (heardId === "public town" ? towns[PUBLIC_ID] : null);
+  if (!heard) return null;
+  const hx = parseCoord(rawX);
+  const hy = parseCoord(rawY);
+  // Keep the original convention: coords typed as heard from public are used as stored map x/y.
+  // Relative to another town: subtract the reference position (same as the old compute).
+  if (heard.id === PUBLIC_ID || heard.name === "public town") {
+    return { x: hx, y: hy };
+  }
+  return { x: hx - heard.x, y: hy - heard.y };
 }
 
 // ---------- Chart ----------
 function drawChart(townMap) {
-  const visible = Object.keys(townMap).filter(n => n !== "public town" && canSee(townMap[n]));
+  const visible = Object.keys(townMap).filter(id => {
+    const t = townMap[id];
+    return t && t.id !== PUBLIC_ID && t.name !== "public town" && canSee(t);
+  });
   const groups = {};
-  visible.forEach(n => {
-    const ic = townMap[n].icon || "default";
+  visible.forEach(id => {
+    const ic = townMap[id].icon || "default";
     if (!groups[ic]) groups[ic] = [];
-    groups[ic].push(n);
+    groups[ic].push(id);
   });
 
   const traces = [];
@@ -281,7 +218,7 @@ function drawChart(townMap) {
     mode: "markers", type: "scatter", name: "Origin",
     marker: { size: 16, color: "#22c55e", symbol: "star", line: { width: 1.5, color: "#fff" } },
     hoverinfo: "text",
-    customdata: ["public town"]
+    customdata: [PUBLIC_ID]
   });
 
   Object.keys(groups).forEach(ic => {
@@ -292,7 +229,7 @@ function drawChart(townMap) {
       y: names.map(n => townMap[n].y),
       text: names.map(n => {
         const t = townMap[n];
-        return `<b>${sanitize(n)}</b><br>` +
+        return `<b>${sanitize(t.name)}</b><br>` +
           `x: ${t.x}  y: ${t.y}<br>` +
           `${style.label} · ${t.reports} report${t.reports !== 1 ? "s" : ""}` +
           (t.visibility !== "public" ? `<br>Visibility: ${t.visibility}` : "") +
@@ -356,11 +293,11 @@ function drawChart(townMap) {
   });
 }
 
-function showDetail(name) {
-  const t = towns[name];
+function showDetail(id) {
+  const t = towns[id];
   if (!t) return;
   const card = document.getElementById("town-detail");
-  document.getElementById("detail-name").textContent = name;
+  document.getElementById("detail-name").textContent = t.name;
   const style = ICON_STYLES[t.icon] || ICON_STYLES.default;
   let html = `
     <div class="meta"><strong>Position:</strong> ${t.x}, ${t.y}</div>
@@ -381,7 +318,7 @@ function showDetail(name) {
   const actions = document.getElementById("detail-actions");
   if (canEdit(t)) {
     actions.classList.remove("hidden");
-    document.getElementById("btn-edit-town").onclick = () => openEditModal(name);
+    document.getElementById("btn-edit-town").onclick = () => openEditModal(t.id);
   } else {
     actions.classList.add("hidden");
   }
@@ -416,7 +353,7 @@ function renderTownList() {
   if (search) {
     list = list.filter(t =>
       t.name.toLowerCase().includes(search) ||
-      t.reporters.some(r => r.toLowerCase().includes(search)) ||
+      (t.reporters||[]).some(r => r.toLowerCase().includes(search)) ||
       (t.ownerNames || []).some(o => o.toLowerCase().includes(search))
     );
   }
@@ -465,7 +402,7 @@ function renderMyTowns() {
       <td class="num">${t.y}</td>
       <td>${t.visibility}</td>
       <td class="num">${t.reports}</td>
-      <td><button class="secondary-btn" data-edit="${sanitize(t.name)}" style="padding:0.25rem 0.6rem;font-size:0.8rem">Edit</button></td>
+      <td><button class="secondary-btn" data-edit="${sanitize(t.id)}" style="padding:0.25rem 0.6rem;font-size:0.8rem">Edit</button></td>
     </tr>`;
   }).join("");
 
@@ -479,14 +416,15 @@ function analyzeReports(data) {
   const byTown = {};
   Object.keys(data || {}).forEach(k => {
     const r = data[k];
-    if (!r || !r.recv) return;
-    const name = (r.recv.name || "").trim();
+    if (!r) return;
+    const name = (r.townName || (r.recv && r.recv.name) || "").trim();
+    if (!name) return;
     if (!byTown[name]) byTown[name] = [];
     byTown[name].push({
       key: k,
       x: parseCoord(r.x),
       y: parseCoord(r.y),
-      send: (r.send && r.send.name) || "",
+      send: r.heardName || (r.send && r.send.name) || "",
       user: r.user || ""
     });
   });
@@ -586,8 +524,8 @@ function renderReportsTable() {
     const badges = f.map(x => `<span class="flag-badge ${x}">${x}</span>`).join(" ");
     return `<tr class="${flagClass}">
       <td>${badges || "—"}</td>
-      <td>${sanitize(r.recv?.name || "?")}</td>
-      <td>${sanitize(r.send?.name || "?")}</td>
+      <td>${sanitize(r.townName || r.recv?.name || "?")}</td>
+      <td>${sanitize(r.heardName || r.send?.name || "?")}</td>
       <td class="num">${r.x}</td>
       <td class="num">${r.y}</td>
       <td>${sanitize(r.user || "")}</td>
@@ -602,7 +540,7 @@ function renderReportsTable() {
       const r = rawData[key];
       const label = r?.recv?.name || key;
       if (!confirm(`Delete report for "${label}"?\n${key}`)) return;
-      try { await townRef.child(key).remove(); }
+      try { await reportRef.child(key).remove(); }
       catch (err) { alert("Delete failed: " + err.message); }
     });
   });
@@ -610,27 +548,31 @@ function renderReportsTable() {
 
 function refreshSelect() {
   const sel = document.getElementById("stown");
-  const current = sel.value || "public town";
-  const names = Object.keys(towns).filter(n => canSee(towns[n]) || n === "public town")
+  if (!sel) return;
+  const current = sel.value || PUBLIC_ID;
+  const list = Object.values(towns).filter(t => canSee(t) || t.id === PUBLIC_ID)
     .sort((a, b) => {
-      if (a === "public town") return -1;
-      if (b === "public town") return 1;
-      return a.localeCompare(b);
+      if (a.id === PUBLIC_ID) return -1;
+      if (b.id === PUBLIC_ID) return 1;
+      return a.name.localeCompare(b.name);
     });
   sel.innerHTML = `<option value="" disabled>Select a known town…</option>` +
-    names.map(n => `<option value="${sanitize(n)}" ${n === current ? "selected" : ""}>${sanitize(n)}</option>`).join("");
+    list.map(t => {
+      const label = t.id === PUBLIC_ID ? "public town (0, 0)" : `${t.name} (${t.x}, ${t.y})`;
+      return `<option value="${sanitize(t.id)}" ${t.id === current ? "selected" : ""}>${sanitize(label)}</option>`;
+    }).join("");
 }
 
 function checkNameSimilarity() {
   const input = document.getElementById("rtown").value.trim().toLowerCase();
   const warn = document.getElementById("name-warning");
   if (!input || input.length < 3) { warn.classList.add("hidden"); return; }
-  const matches = Object.keys(towns).filter(n => {
-    const ln = n.toLowerCase();
-    return (ln.includes(input) || input.includes(ln) || levenshtein(ln, input) <= 2);
+  const matches = Object.values(towns).filter(tw => {
+    const ln = (tw.name || "").toLowerCase();
+    return ln && (ln.includes(input) || input.includes(ln) || levenshtein(ln, input) <= 2);
   }).slice(0, 4);
   if (matches.length) {
-    warn.innerHTML = `Similar existing: <strong>${matches.map(sanitize).join(", ")}</strong>.`;
+    warn.innerHTML = `Similar existing: <strong>${matches.map(tw => sanitize(tw.name) + " (" + tw.x + "," + tw.y + ")").join(", ")}</strong> — same name far away will create a second town.`;
     warn.classList.remove("hidden");
   } else warn.classList.add("hidden");
 }
@@ -647,16 +589,17 @@ function levenshtein(a, b) {
 }
 
 // ---------- Edit modal ----------
-function openEditModal(name) {
-  const t = towns[name];
+function openEditModal(id) {
+  const t = towns[id];
   if (!t || !canEdit(t)) return;
-  document.getElementById("edit-original-name").value = name;
-  document.getElementById("edit-name").value = name;
-  document.getElementById("edit-x").value = "";
-  document.getElementById("edit-y").value = "";
+  document.getElementById("edit-original-name").value = t.id;
+  document.getElementById("edit-name").value = t.name;
+  document.getElementById("edit-x").value = t.x;
+  document.getElementById("edit-y").value = t.y;
   document.getElementById("edit-icon").value = t.icon || "default";
-  document.getElementById("edit-visibility").value = t.visibility || "public";
-  document.getElementById("edit-desc").value = (t.descs && t.descs[0]) || "";
+  const vis = document.getElementById("edit-visibility");
+  if (vis) vis.value = t.visibility || "public";
+  document.getElementById("edit-desc").value = t.desc || (t.descs && t.descs[0]) || "";
   document.getElementById("edit-modal").classList.remove("hidden");
 }
 
@@ -666,52 +609,41 @@ document.getElementById("edit-cancel").addEventListener("click", () => {
 
 document.getElementById("edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const original = document.getElementById("edit-original-name").value;
+  const uid = requireAuth();
+  if (!uid) return;
+
+  const id = document.getElementById("edit-original-name").value;
   const newName = document.getElementById("edit-name").value.trim();
   const x = document.getElementById("edit-x").value;
   const y = document.getElementById("edit-y").value;
   const icon = document.getElementById("edit-icon").value;
-  const visibility = document.getElementById("edit-visibility").value;
+  const visEl = document.getElementById("edit-visibility");
+  const visibility = visEl ? visEl.value : "public";
   const desc = document.getElementById("edit-desc").value.trim();
 
   if (!newName) return alert("Name required");
+  const t = towns[id];
+  if (!t || !canEdit(t)) return alert("You cannot edit this town.");
 
-  const t = towns[original];
-  const meta = {
+  const patch = {
     name: newName,
     icon: icon || "default",
     visibility: visibility || "public",
     updatedAt: Date.now()
   };
-  if (desc) meta.desc = desc;
-  if (currentUser) {
-    meta.ownerId = currentUser.id;
-    meta.ownerName = currentUser.username;
-  }
-
-  // Optional absolute position override (map coords, not HETUW)
+  if (desc) patch.desc = desc;
+  else patch.desc = null;
   if (x !== "" && y !== "") {
-    meta.overrideX = parseInt(x, 10);
-    meta.overrideY = parseInt(y, 10);
-  } else if (t) {
-    // keep current displayed position as override so rename still has coords
-    meta.overrideX = t.x;
-    meta.overrideY = t.y;
+    patch.x = parseInt(x, 10);
+    patch.y = parseInt(y, 10);
   }
+  // ownerId must stay the original owner or rules reject the write
+  if (t.ownerId) patch.ownerId = t.ownerId;
+  else patch.ownerId = uid;
 
   try {
-    // Write metadata under the (possibly new) name — this is the real "edit"
-    await metaRef.child(metaKey(newName)).set(meta);
-
-    // If renamed, remove old meta key so the old label stops getting overlay
-    if (newName !== original) {
-      await metaRef.child(metaKey(original)).remove();
-    }
-
-    // Do NOT push a new report unless user explicitly set new coords
-    // (reports stay as the democratic position source; meta holds owner edits)
+    await townRef.child(id).update(patch);
     document.getElementById("edit-modal").classList.add("hidden");
-    alert("Town updated. Map will refresh shortly.");
   } catch (err) {
     alert("Save failed: " + err.message);
   }
@@ -800,6 +732,7 @@ function logout() {
   currentUser = null;
   isAdmin = false;
   localStorage.removeItem("2hol_discord");
+  if (firebase.auth) firebase.auth().signOut().catch(() => {});
   updateAuthUI();
   updateAdminPanel();
   processAndRender();
@@ -828,18 +761,68 @@ function updateAuthUI() {
 }
 
 function restoreSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("2hol_discord") || "null");
-    if (saved && saved.id) {
-      currentUser = saved;
-      updateAuthUI();
-    }
-  } catch (_) {}
+  // Discord localStorage is only a profile cache. Firebase Auth is the real session.
+  // Wait for onAuthStateChanged in startAuthListener().
+}
+
+function applyFirebaseUser(fbUser) {
+  if (!fbUser) {
+    currentUser = null;
+    isAdmin = false;
+    localStorage.removeItem("2hol_discord");
+    updateAuthUI();
+    updateAdminPanel();
+    processAndRender();
+    return;
+  }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("2hol_discord") || "null"); } catch (_) {}
+  if (!saved || saved.id !== fbUser.uid) {
+    saved = {
+      id: fbUser.uid,
+      username: (saved && saved.username) || fbUser.displayName || fbUser.uid,
+      avatar: (saved && saved.avatar) || "",
+      roles: [],
+      roleIds: [],
+      level: 1
+    };
+  }
+  currentUser = { ...saved, id: fbUser.uid };
+  localStorage.setItem("2hol_discord", JSON.stringify(currentUser));
+  updateAuthUI();
+  checkAdminStatus();
+}
+
+function startAuthListener() {
+  if (!firebase.auth) return;
+  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+  firebase.auth().onAuthStateChanged(applyFirebaseUser);
 }
 
 // ---------- Main data ----------
+async function ensurePublicTown() {
+  if (!isAdmin) return;
+  if (rawTowns[PUBLIC_ID] && rawTowns[PUBLIC_ID].name) return;
+  const uid = firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid;
+  if (!uid) return;
+  try {
+    await townRef.child(PUBLIC_ID).set({
+      name: "public town",
+      x: 0, y: 0,
+      icon: "star",
+      visibility: "public",
+      ownerId: uid,
+      ownerName: currentUser ? currentUser.username : "admin",
+      createdAt: Date.now()
+    });
+  } catch (e) {
+    console.warn("Could not seed public town", e);
+  }
+}
+
 function processAndRender() {
-  towns = computeTowns(rawData, townMeta);
+  towns = computeTowns(rawTowns, rawReports);
+  rawData = rawReports;
   drawChart(towns);
   refreshSelect();
   if (document.getElementById("view-list").classList.contains("active")) renderTownList();
@@ -848,59 +831,81 @@ function processAndRender() {
 }
 
 townRef.on("value", ss => {
-  rawData = ss.val() || {};
+  rawTowns = ss.val() || {};
   processAndRender();
 });
-metaRef.on("value", ss => {
-  // Index meta by both path key and display name
-  const raw = ss.val() || {};
-  townMeta = {};
-  Object.keys(raw).forEach(k => {
-    const m = raw[k];
-    if (!m) return;
-    townMeta[k] = m;
-    if (m.name) townMeta[m.name] = m;
-  });
+reportRef.on("value", ss => {
+  rawReports = ss.val() || {};
   processAndRender();
 });
 
 // ---------- Form submit ----------
 document.getElementById("bellreport").addEventListener("submit", async (evt) => {
   evt.preventDefault();
+  const uid = requireAuth();
+  if (!uid) return;
+
   const rtown = document.getElementById("rtown").value.trim();
-  const stown = document.getElementById("stown").value;
+  const heardId = document.getElementById("stown").value;
   const xcoord = document.getElementById("xcoord").value;
   const ycoord = document.getElementById("ycoord").value;
-
-  const username = document.getElementById("user").value.trim();
-  const desc = document.getElementById("desc").value.trim();
-  const icon = document.getElementById("icon").value || "default";
-  const visibility = document.getElementById("visibility").value || "public";
+  const username = (document.getElementById("user").value.trim() || currentUser.username);
+  const descEl = document.getElementById("desc");
+  const desc = descEl ? descEl.value.trim() : "";
+  const icon = (document.getElementById("icon") && document.getElementById("icon").value) || "default";
+  const visibility = (document.getElementById("visibility") && document.getElementById("visibility").value) || "public";
 
   if (!rtown) return alert("Please provide a name for your town.");
-  if (!stown) return alert("Please select which town rang the bell.");
+  if (!heardId) return alert("Please select which town rang the bell.");
   if (xcoord === "" || ycoord === "") return alert("Please enter both coordinates.");
 
-  const payload = {
-    recv: { name: rtown, type: "new" },
-    send: { name: stown, type: "existing" },
-    user: username,
-    x: xcoord, y: ycoord,
-    icon, visibility, type: icon
-  };
-  if (desc) payload.desc = desc;
-  if (currentUser) {
-    payload.ownerId = currentUser.id;
-    payload.ownerName = currentUser.username;
-  }
-    
+  const pos = resolveFromHeard(heardId, xcoord, ycoord);
+  if (!pos) return alert("Unknown reference town. Pick a town from the list.");
+
+  const existing = findNearbySameName(rtown, pos.x, pos.y);
   try {
-    await townRef.push(payload);
-    alert("Town reported! Map will update shortly.");
+    let townId;
+    if (existing) {
+      townId = existing.id;
+    } else {
+      const rec = {
+        name: rtown,
+        x: pos.x,
+        y: pos.y,
+        icon,
+        visibility,
+        ownerId: uid,
+        ownerName: username,
+        createdAt: Date.now()
+      };
+      if (desc) rec.desc = desc;
+      const created = await townRef.push(rec);
+      townId = created.key;
+    }
+
+    const report = {
+      townId,
+      heardId,
+      townName: rtown,
+      heardName: (towns[heardId] && towns[heardId].name) || heardId,
+      x: parseCoord(xcoord),
+      y: parseCoord(ycoord),
+      absX: pos.x,
+      absY: pos.y,
+      userId: uid,
+      user: username,
+      createdAt: Date.now()
+    };
+    if (desc) report.desc = desc;
+    await reportRef.push(report);
+
+    alert(existing
+      ? "Added a confirmation report to the existing town nearby with that name."
+      : "Town added.");
     document.getElementById("rtown").value = "";
     document.getElementById("xcoord").value = "";
     document.getElementById("ycoord").value = "";
-    document.getElementById("desc").value = "";
+    if (descEl) descEl.value = "";
   } catch (err) {
     alert("Failed to save: " + err.message);
   }
@@ -945,7 +950,7 @@ async function checkAdminStatus() {
     isAdmin = false;
   }
   updateAdminPanel();
-  // re-render so visibility & edit buttons update
+  if (isAdmin) ensurePublicTown();
   processAndRender();
 }
 
@@ -976,8 +981,9 @@ function updateAdminPanel() {
 }
 
 // Boot
-restoreSession();
-handleDiscordCallback().then(() => checkAdminStatus());
+handleDiscordCallback().then(() => {
+  startAuthListener();
+});
 switchView("map");
 updateAuthUI();
-checkAdminStatus();
+
