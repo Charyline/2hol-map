@@ -273,7 +273,14 @@ function drawChart(townMap) {
       gridcolor: "#1f2937", tickfont: { size: 11 }
     },
     showlegend: true,
-    legend: { bgcolor: "rgba(26,35,50,0.8)", bordercolor: "#2d3a4f", font: { size: 11 } },
+    legend: {
+      bgcolor: "rgba(0,0,0,0)",
+      bordercolor: "#2d3a4f",
+      font: { size: 11 },
+      x: 1,
+      y: 1,
+      xanchor: 'right'
+    },
     hovermode: "closest", dragmode: "pan"
   };
 
@@ -316,9 +323,19 @@ function showDetail(id) {
   document.getElementById("detail-body").innerHTML = html;
 
   const actions = document.getElementById("detail-actions");
-  if (canEdit(t)) {
+  if (canEdit(t) || isAdmin) {
     actions.classList.remove("hidden");
     document.getElementById("btn-edit-town").onclick = () => openEditModal(t.id);
+    let del = document.getElementById("btn-delete-town");
+    if (!del) {
+      del = document.createElement("button");
+      del.id = "btn-delete-town";
+      del.className = "del-btn";
+      del.textContent = "Delete town";
+      actions.appendChild(del);
+    }
+    del.classList.toggle("hidden", !isAdmin || t.id === PUBLIC_ID);
+    del.onclick = () => deleteTown(t.id);
   } else {
     actions.classList.add("hidden");
   }
@@ -487,62 +504,57 @@ function analyzeReports(data) {
   return flags;
 }
 
+async function deleteTown(id) {
+  const t = towns[id];
+  if (!t) return alert("Town not found.");
+  if (t.id === PUBLIC_ID || t.name === "public town") return alert("Cannot delete public town.");
+  if (!isAdmin && !canEdit(t)) return alert("You cannot delete this town.");
+  if (!confirm(`Delete town "${t.name}" from the map?\nThis also removes its confirmation reports.`)) return;
+  try {
+    await townRef.child(id).remove();
+    const reps = rawReports || {};
+    const ops = Object.keys(reps)
+      .filter(k => reps[k] && reps[k].townId === id)
+      .map(k => reportRef.child(k).remove());
+    await Promise.all(ops);
+  } catch (err) {
+    alert("Delete failed: " + err.message);
+  }
+}
+
 function renderReportsTable() {
   const tbody = document.querySelector("#reports-table tbody");
   if (!tbody) return;
   const search = (document.getElementById("search-reports").value || "").toLowerCase();
-  const problemsOnly = document.getElementById("filter-problems")?.checked;
 
-  const flags = analyzeReports(rawData);
-  let keys = Object.keys(rawData || {});
-
+  let list = Object.values(towns).filter(t => t.id !== PUBLIC_ID && t.name !== "public town");
   if (search) {
-    keys = keys.filter(k => JSON.stringify(rawData[k]).toLowerCase().includes(search));
+    list = list.filter(t =>
+      (t.name || "").toLowerCase().includes(search) ||
+      (t.ownerName || "").toLowerCase().includes(search) ||
+      (t.ownerNames || []).some(o => o.toLowerCase().includes(search)) ||
+      (t.id || "").toLowerCase().includes(search)
+    );
   }
-  if (problemsOnly) {
-    keys = keys.filter(k => (flags[k] || []).length > 0);
-  }
+  list.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Sort: flagged first, then by town name
-  keys.sort((a, b) => {
-    const fa = (flags[a] || []).length;
-    const fb = (flags[b] || []).length;
-    if (fa !== fb) return fb - fa;
-    const na = (rawData[a]?.recv?.name || "").toLowerCase();
-    const nb = (rawData[b]?.recv?.name || "").toLowerCase();
-    return na.localeCompare(nb);
-  });
+  const countEl = document.getElementById("report-count");
+  if (countEl) countEl.textContent = `${list.length} towns`;
 
-  const flaggedCount = keys.filter(k => (flags[k] || []).length > 0).length;
-  document.getElementById("report-count").textContent =
-    `${keys.length} shown` + (flaggedCount ? ` · ${flaggedCount} flagged` : "");
-
-  tbody.innerHTML = keys.map(k => {
-    const r = rawData[k];
-    const f = flags[k] || [];
-    const flagClass = f.length ? "flag-" + f[0] : "";
-    const badges = f.map(x => `<span class="flag-badge ${x}">${x}</span>`).join(" ");
-    return `<tr class="${flagClass}">
-      <td>${badges || "—"}</td>
-      <td>${sanitize(r.townName || r.recv?.name || "?")}</td>
-      <td>${sanitize(r.heardName || r.send?.name || "?")}</td>
-      <td class="num">${r.x}</td>
-      <td class="num">${r.y}</td>
-      <td>${sanitize(r.user || "")}</td>
-      <td style="font-size:0.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${k}">${k}</td>
-      <td><button class="del-btn" data-key="${k}">Delete</button></td>
+  tbody.innerHTML = list.map(t => {
+    return `<tr>
+      <td><strong>${sanitize(t.name)}</strong></td>
+      <td class="num">${t.x}</td>
+      <td class="num">${t.y}</td>
+      <td>${sanitize((t.ownerNames || [])[0] || t.ownerId || "—")}</td>
+      <td class="num">${t.reports || 0}</td>
+      <td style="font-size:0.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis" title="${t.id}">${t.id}</td>
+      <td><button class="del-btn" data-del-town="${sanitize(t.id)}">Delete</button></td>
     </tr>`;
   }).join("");
 
-  tbody.querySelectorAll(".del-btn").forEach(btn => {
-    btn.addEventListener("click", async (e) => {
-      const key = e.target.dataset.key;
-      const r = rawData[key];
-      const label = r?.recv?.name || key;
-      if (!confirm(`Delete report for "${label}"?\n${key}`)) return;
-      try { await reportRef.child(key).remove(); }
-      catch (err) { alert("Delete failed: " + err.message); }
-    });
+  tbody.querySelectorAll("[data-del-town]").forEach(btn => {
+    btn.addEventListener("click", () => deleteTown(btn.dataset.delTown));
   });
 }
 
