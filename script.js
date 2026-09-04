@@ -528,16 +528,23 @@ function analyzeReports(data) {
 
 async function deleteTown(id) {
   id = String(id || "").trim();
-  if (!id) return;
-  let t = towns[id] || Object.values(towns).find(x => x && x.name === id);
-  if (t) id = t.id;
-  if (!t) t = { id, name: id };
-  if (id === PUBLIC_ID || t.name === "public town") return alert("Cannot delete public town.");
-  if (!isAdmin && !canEdit(t)) return alert("You cannot delete this town.");
-  if (!confirm(`Delete town "${t.name}" from the map?\nThis also removes its confirmation reports.`)) return;
+  if (!id || id === "undefined" || id === "null") {
+    alert("Delete failed: missing town id.");
+    return;
+  }
+  let t = towns[id] || Object.values(towns).find(x => x && (x.id === id || x.name === id));
+  if (t && t.id) id = t.id;
+  if (!t) t = { id: id, name: id, ownerId: currentUser && currentUser.id };
+  if (id === PUBLIC_ID || t.name === "public town") {
+    alert("Cannot delete public town.");
+    return;
+  }
+  if (!isAdmin && !canEdit(t)) {
+    alert("You cannot delete this town.");
+    return;
+  }
+  if (!confirm("Delete town \"" + t.name + "\" from the map?")) return;
   try {
-    // The map is drawn from /towns/{id}. Removing only a /reports row
-    // updates lists that read reports, but leaves the dot in place.
     await townRef.child(id).remove();
     delete rawTowns[id];
     delete towns[id];
@@ -545,13 +552,13 @@ async function deleteTown(id) {
     if (detail) detail.classList.add("hidden");
     processAndRender();
     const reps = rawReports || {};
-    const leftovers = Object.keys(reps)
-      .filter(k => reps[k] && (reps[k].townId === id || reps[k].townName === t.name));
-    for (const k of leftovers) {
-      try { await reportRef.child(k).remove(); } catch (_) { /* owners cannot delete others' reports */ }
+    for (const k of Object.keys(reps)) {
+      const r = reps[k];
+      if (!r || (r.townId !== id && r.townName !== t.name)) continue;
+      try { await reportRef.child(k).remove(); } catch (_) {}
     }
   } catch (err) {
-    alert("Delete failed: " + err.message);
+    alert("Delete failed: " + (err && err.message ? err.message : err));
   }
 }
 
