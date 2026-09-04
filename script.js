@@ -94,7 +94,7 @@ function parseCoord(v) {
 
 function userLevel() {
   if (isAdmin) return 5;
-  return currentUser ? (currentUser.level || 1) : 0;
+  return currentUser ? (currentUser.level || 0) : 0;
 }
 
 function canSee(town) {
@@ -694,7 +694,7 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
 
 // ---------- Discord Auth ----------
 function levelFromRoles(roles) {
-  let level = 1; // logged-in + in guild
+  let level = 0; // public only until an experience role is present
   (roles || []).forEach((r) => {
     const n = ROLE_LEVELS[String(r).toLowerCase()] || ROLE_LEVELS[String(r)] || 0;
     if (n > level) level = n;
@@ -832,7 +832,7 @@ function applyFirebaseUser(fbUser) {
   }
   currentUser = { ...saved, id: fbUser.uid };
   currentUser.level = Math.max(
-    currentUser.level || 1,
+    currentUser.level || 0,
     levelFromRoles(currentUser.roles),
     levelFromRoles(currentUser.roleIds)
   );
