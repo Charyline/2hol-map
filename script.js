@@ -121,7 +121,7 @@ function computeTowns(tdata, meta) {
       otherName: String(otherName || "").trim(),
       x: parseCoord(tmp.x),
       y: parseCoord(tmp.y),
-      user: sanitize(tmp.user || "Anonymous"),
+      user: sanitize(tmp.user || ""),
       desc: sanitize(tmp.desc || ""),
       ownerId: tmp.ownerId || null,
       ownerName: sanitize(tmp.ownerName || ""),
@@ -146,11 +146,11 @@ function computeTowns(tdata, meta) {
       const src = known[r.otherName];
       let absX, absY;
       if (r.otherName === "public town") {
-        absX = -r.x;
-        absY = -r.y;
+        absX = r.x;
+        absY = r.y;
       } else {
-        absX = src.x - r.x;
-        absY = src.y - r.y;
+        absX = r.x - src.x;
+        absY = r.y - src.y;
       }
 
       if (!byName[r.townName]) byName[r.townName] = [];
@@ -366,8 +366,6 @@ function showDetail(name) {
     <div class="meta"><strong>Position:</strong> ${t.x}, ${t.y}</div>
     <div class="meta"><strong>Type:</strong> ${style.label}</div>
     <div class="meta"><strong>Visibility:</strong> ${t.visibility}</div>
-    <div class="meta"><strong>Reports:</strong> ${t.reports}</div>
-    <div class="meta"><strong>Reporters:</strong> ${t.reporters.join(", ") || "—"}</div>
   `;
   if (t.ownerNames && t.ownerNames.length) {
     html += `<div class="meta"><strong>Owners:</strong> ${t.ownerNames.join(", ")}</div>`;
@@ -629,10 +627,10 @@ function checkNameSimilarity() {
   if (!input || input.length < 3) { warn.classList.add("hidden"); return; }
   const matches = Object.keys(towns).filter(n => {
     const ln = n.toLowerCase();
-    return ln !== input && (ln.includes(input) || input.includes(ln) || levenshtein(ln, input) <= 2);
+    return (ln.includes(input) || input.includes(ln) || levenshtein(ln, input) <= 2);
   }).slice(0, 4);
   if (matches.length) {
-    warn.innerHTML = `Similar existing: <strong>${matches.map(sanitize).join(", ")}</strong>. Exact name match will be averaged.`;
+    warn.innerHTML = `Similar existing: <strong>${matches.map(sanitize).join(", ")}</strong>.`;
     warn.classList.remove("hidden");
   } else warn.classList.add("hidden");
 }
@@ -815,10 +813,15 @@ function updateAuthUI() {
     document.getElementById("user-name").textContent = currentUser.username;
     document.getElementById("user-avatar").src = currentUser.avatar;
     myBtn.classList.remove("hidden");
+    document.getElementById("user").placeholder = currentUser.username;
+    document.getElementById("btn-report").classList.remove("hidden");
+    document.getElementById("view-report").classList.remove("hidden");
   } else {
     loginBtn.classList.remove("hidden");
     menu.classList.add("hidden");
     myBtn.classList.add("hidden");
+    document.getElementById("btn-report").classList.add("hidden");
+    document.getElementById("view-report").classList.add("hidden");
   }
 }
 
@@ -866,7 +869,8 @@ document.getElementById("bellreport").addEventListener("submit", async (evt) => 
   const stown = document.getElementById("stown").value;
   const xcoord = document.getElementById("xcoord").value;
   const ycoord = document.getElementById("ycoord").value;
-  const username = document.getElementById("user").value.trim() || (currentUser ? currentUser.username : "Anonymous");
+
+  const username = document.getElementById("user").value.trim();
   const desc = document.getElementById("desc").value.trim();
   const icon = document.getElementById("icon").value || "default";
   const visibility = document.getElementById("visibility").value || "public";
@@ -887,7 +891,7 @@ document.getElementById("bellreport").addEventListener("submit", async (evt) => 
     payload.ownerId = currentUser.id;
     payload.ownerName = currentUser.username;
   }
-
+    
   try {
     await townRef.push(payload);
     alert("Town reported! Map will update shortly.");
@@ -904,9 +908,6 @@ document.getElementById("bellreport").addEventListener("submit", async (evt) => 
 document.querySelectorAll(".nav-btn[data-view]").forEach(btn => {
   btn.addEventListener("click", () => switchView(btn.dataset.view));
 });
-document.querySelector(".panel-header").addEventListener("click", () => {
-  document.getElementById("form-panel").classList.toggle("collapsed");
-});
 document.querySelector(".close-detail").addEventListener("click", () => {
   document.getElementById("town-detail").classList.add("hidden");
 });
@@ -922,6 +923,10 @@ document.getElementById("recompute-btn").addEventListener("click", () => {
   processAndRender();
   alert("Map recomputed.");
 });
+
+if (currentUser) {
+  document.getElementById("user").placeholder = currentUser.username;
+}
 
 // ---------- Admin whitelist (Firebase /admins/{discordId} = true) ----------
 async function checkAdminStatus() {
@@ -943,18 +948,21 @@ async function checkAdminStatus() {
 }
 
 function updateAdminPanel() {
+  const adminTab = document.getElementById("btn-admin");
   const denied = document.getElementById("admin-denied");
   const panel = document.getElementById("admin-panel");
   const hint = document.getElementById("admin-denied-hint");
   if (!denied || !panel) return;
 
   if (isAdmin) {
+    adminTab.classList.remove("hidden");
     denied.classList.add("hidden");
     panel.classList.remove("hidden");
     renderReportsTable();
   } else {
     denied.classList.remove("hidden");
     panel.classList.add("hidden");
+    adminTab.classList.add("hidden");
     if (hint) {
       if (!currentUser) {
         hint.textContent = "Log in with Discord first. Then ask an existing admin to add your Discord ID under /admins/{id} = true in Firebase.";
