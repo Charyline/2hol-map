@@ -163,9 +163,11 @@
             Visibility
             <select id="visibility">
               <option value="public">Public (everyone)</option>
-              <option value="members">Members (logged-in)</option>
-              <option value="vets">Vets &amp; higher</option>
-              <option value="private">Private (only owners / admins)</option>
+              <option value="ncl">Not Completely Lost+ (10h)</option>
+              <option value="exp">Well Experienced+ (50h)</option>
+              <option value="vet">Veteran+ (375h)</option>
+              <option value="wil">What is life?+ (1000h)</option>
+              <option value="private">Private (owners / admins)</option>
             </select>
           </label>
         </div>
@@ -238,12 +240,12 @@
           <input type="text" id="edit-name" required maxlength="60">
         </label>
         <div class="coord-row">
-          <label class="coord-cont">
+          <label>
             Absolute X <span class="opt">(map coords)</span>
             <input type="number" id="edit-x" step="1">
           </label>
-          <label class="coord-cont">
-            Absolute Y <span class="opt"> </span>
+          <label>
+            Absolute Y
             <input type="number" id="edit-y" step="1">
           </label>
         </div>
@@ -265,8 +267,10 @@
           Visibility
           <select id="edit-visibility">
             <option value="public">Public</option>
-            <option value="members">Members</option>
-            <option value="vets">Vets &amp; higher</option>
+            <option value="ncl">Not Completely Lost+</option>
+            <option value="exp">Well Experienced+</option>
+            <option value="vet">Veteran+</option>
+            <option value="wil">What is life?+</option>
             <option value="private">Private</option>
           </select>
         </label>
@@ -290,7 +294,7 @@
   <!-- Libraries -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>  
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <script src="./script.js"></script>

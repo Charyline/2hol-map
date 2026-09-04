@@ -9,11 +9,34 @@
 // Set this to the PUBLIC URL of your Node process (no trailing slash).
 const AUTH_SERVER_URL = "https://aaaa.prof.ninja";
 const DISCORD_GUILD_ID  = "423293333864054833";  // official 2HOL guild
-// Role name OR role id → level. Add your real 2HOL role names / IDs here.
+// Discord experience roles (name, /slash alias, and later the snowflake id).
+// Higher number = more hours. Visibility "vet" means level >= Veteran.
+// Paste role IDs as extra keys when you have them, e.g. "123456789012345678": 3
 const ROLE_LEVELS = {
-  "admin": 5, "moderator": 4, "mod": 4, "elder": 3, "veteran": 2, "vet": 2, "member": 1
+  "not completely lost": 1, "ncl": 1, "966381752614535178": 1,
+  "well experienced": 2, "exp": 2, "710862113630847067": 2,
+  "veteran": 3, "vet": 3, "710882519041441842": 3,
+  "what is life?": 4, "what is life": 4, "wil": 4, "710888589612810332": 4,
+  "admin": 5, "moderator": 5, "mod": 5
 };
-const VIS_LEVEL = { public: 0, members: 1, vets: 2, private: 99 };
+const VIS_LEVEL = {
+  public: 0,
+  ncl: 1, members: 1,
+  exp: 2,
+  vet: 3, vets: 3,
+  wil: 4,
+  private: 99
+};
+const VIS_LABEL = {
+  public: "Public",
+  ncl: "Not Completely Lost+",
+  members: "Not Completely Lost+",
+  exp: "Well Experienced+",
+  vet: "Veteran+",
+  vets: "Veteran+",
+  wil: "What is life?+",
+  private: "Private (owners)"
+};
 
 const ICON_STYLES = {
   default:   { symbol: "circle",        color: "#3b82f6", label: "Default" },
@@ -232,7 +255,7 @@ function drawChart(townMap) {
         return `<b>${sanitize(t.name)}</b><br>` +
           `x: ${t.x}  y: ${t.y}<br>` +
           `${style.label} · ${t.reports} report${t.reports !== 1 ? "s" : ""}` +
-          (t.visibility !== "public" ? `<br>Visibility: ${t.visibility}` : "") +
+          (t.visibility !== "public" ? `<br>Visibility: ${VIS_LABEL[t.visibility] || t.visibility}` : "") +
           (t.uncertain ? "<br><i style='color:#f59e0b'>position uncertain</i>" : "");
       }),
       customdata: names,
@@ -273,14 +296,7 @@ function drawChart(townMap) {
       gridcolor: "#1f2937", tickfont: { size: 11 }
     },
     showlegend: true,
-    legend: {
-      bgcolor: "rgba(0,0,0,0)",
-      bordercolor: "#2d3a4f",
-      font: { size: 11 },
-      x: 1,
-      y: 1,
-      xanchor: 'right'
-    },
+    legend: { bgcolor: "rgba(26,35,50,0.8)", bordercolor: "#2d3a4f", font: { size: 11 } },
     hovermode: "closest", dragmode: "pan"
   };
 
@@ -309,7 +325,7 @@ function showDetail(id) {
   let html = `
     <div class="meta"><strong>Position:</strong> ${t.x}, ${t.y}</div>
     <div class="meta"><strong>Type:</strong> ${style.label}</div>
-    <div class="meta"><strong>Visibility:</strong> ${t.visibility}</div>
+    <div class="meta"><strong>Visibility:</strong> ${VIS_LABEL[t.visibility] || t.visibility}</div>
   `;
   if (t.ownerNames && t.ownerNames.length) {
     html += `<div class="meta"><strong>Owners:</strong> ${t.ownerNames.join(", ")}</div>`;
@@ -800,6 +816,11 @@ function applyFirebaseUser(fbUser) {
     };
   }
   currentUser = { ...saved, id: fbUser.uid };
+  currentUser.level = Math.max(
+    currentUser.level || 1,
+    levelFromRoles(currentUser.roles),
+    levelFromRoles(currentUser.roleIds)
+  );
   localStorage.setItem("2hol_discord", JSON.stringify(currentUser));
   updateAuthUI();
   checkAdminStatus();
