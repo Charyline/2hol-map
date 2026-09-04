@@ -527,18 +527,27 @@ function analyzeReports(data) {
 }
 
 async function deleteTown(id) {
-  const t = towns[id];
-  if (!t) return alert("Town not found.");
-  if (t.id === PUBLIC_ID || t.name === "public town") return alert("Cannot delete public town.");
+  id = String(id || "").trim();
+  if (!id) return;
+  let t = towns[id] || Object.values(towns).find(x => x && x.name === id);
+  if (t) id = t.id;
+  if (!t) t = { id, name: id };
+  if (id === PUBLIC_ID || t.name === "public town") return alert("Cannot delete public town.");
   if (!isAdmin && !canEdit(t)) return alert("You cannot delete this town.");
   if (!confirm(`Delete town "${t.name}" from the map?\nThis also removes its confirmation reports.`)) return;
   try {
+    // The map is drawn from /towns/{id}. Removing only a /reports row
+    // updates lists that read reports, but leaves the dot in place.
     await townRef.child(id).remove();
     const reps = rawReports || {};
-    const ops = Object.keys(reps)
-      .filter(k => reps[k] && reps[k].townId === id)
-      .map(k => reportRef.child(k).remove());
-    await Promise.all(ops);
+    await Promise.all(Object.keys(reps)
+      .filter(k => reps[k] && (reps[k].townId === id || reps[k].townName === t.name))
+      .map(k => reportRef.child(k).remove()));
+    delete rawTowns[id];
+    delete towns[id];
+    const detail = document.getElementById("town-detail");
+    if (detail) detail.classList.add("hidden");
+    processAndRender();
   } catch (err) {
     alert("Delete failed: " + err.message);
   }
