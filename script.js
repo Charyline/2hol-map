@@ -435,12 +435,18 @@ function renderMyTowns() {
       <td class="num">${t.y}</td>
       <td>${t.visibility}</td>
       <td class="num">${t.reports}</td>
-      <td><button class="secondary-btn" data-edit="${sanitize(t.id)}" style="padding:0.25rem 0.6rem;font-size:0.8rem">Edit</button></td>
+      <td>
+        <button class="secondary-btn" data-edit="${sanitize(t.id)}" style="padding:0.25rem 0.6rem;font-size:0.8rem">Edit</button>
+        <button class="del-btn" data-del="${sanitize(t.id)}" style="margin-left:0.35rem">Delete</button>
+      </td>
     </tr>`;
   }).join("");
 
   tbody.querySelectorAll("[data-edit]").forEach(btn => {
     btn.addEventListener("click", () => openEditModal(btn.dataset.edit));
+  });
+  tbody.querySelectorAll("[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => deleteTown(btn.dataset.del));
   });
 }
 
