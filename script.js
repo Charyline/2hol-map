@@ -220,6 +220,71 @@ function resolveFromHeard(heardId, rawX, rawY) {
 }
 
 // ---------- Chart ----------
+
+function attachPinchZoom(gd) {
+  if (!gd || gd._pinchBound) return;
+  gd._pinchBound = true;
+
+  let startDist = 0;
+  let startRanges = null;
+  let anchor = null;
+
+  function touchDist(touches) {
+    const a = touches[0], b = touches[1];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  function pinchAnchor(touches) {
+    const rect = gd.getBoundingClientRect();
+    const mx = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+    const my = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
+    const xa = gd._fullLayout && gd._fullLayout.xaxis;
+    const ya = gd._fullLayout && gd._fullLayout.yaxis;
+    if (!xa || !ya || typeof xa.p2l !== "function") return null;
+    return {
+      x: xa.p2l(mx - (xa._offset || 0)),
+      y: ya.p2l(my - (ya._offset || 0))
+    };
+  }
+
+  gd.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 2) return;
+    const xa = gd._fullLayout && gd._fullLayout.xaxis;
+    const ya = gd._fullLayout && gd._fullLayout.yaxis;
+    if (!xa || !ya || !xa.range || !ya.range) return;
+    startDist = touchDist(e.touches);
+    startRanges = { x: xa.range.slice(), y: ya.range.slice() };
+    anchor = pinchAnchor(e.touches);
+    e.preventDefault();
+  }, { passive: false });
+
+  gd.addEventListener("touchmove", (e) => {
+    if (e.touches.length !== 2 || !startDist || !startRanges || !anchor) return;
+    e.preventDefault();
+    const d = touchDist(e.touches);
+    if (d < 8) return;
+    const scale = startDist / d;
+    Plotly.relayout(gd, {
+      "xaxis.range": [
+        anchor.x - scale * (anchor.x - startRanges.x[0]),
+        anchor.x + scale * (startRanges.x[1] - anchor.x)
+      ],
+      "yaxis.range": [
+        anchor.y - scale * (anchor.y - startRanges.y[0]),
+        anchor.y + scale * (startRanges.y[1] - anchor.y)
+      ]
+    });
+  }, { passive: false });
+
+  gd.addEventListener("touchend", (e) => {
+    if (e.touches.length < 2) {
+      startDist = 0;
+      startRanges = null;
+      anchor = null;
+    }
+  });
+}
+
 function drawChart(townMap) {
   const visible = Object.keys(townMap).filter(id => {
     const t = townMap[id];
@@ -285,13 +350,15 @@ function drawChart(townMap) {
     font: { color: "#e7ecf3", family: "Inter, sans-serif" },
     margin: { t: 30, r: 20, b: 40, l: 50 },
     xaxis: {
-      title: "X", range: [-maxAbs, maxAbs],
+      minallowed: -maxAbs * 2, maxallowed: maxAbs * 2,
+      range: [-maxAbs, maxAbs],
       zeroline: true, zerolinecolor: "#6b7280", zerolinewidth: 2,
       gridcolor: "#1f2937", tickfont: { size: 11 },
       scaleanchor: "y", scaleratio: 1
     },
     yaxis: {
-      title: "Y", range: [-maxAbs, maxAbs],
+      minallowed: -maxAbs * 2, maxallowed: maxAbs * 2,
+      range: [-maxAbs, maxAbs],
       zeroline: true, zerolinecolor: "#6b7280", zerolinewidth: 2,
       gridcolor: "#1f2937", tickfont: { size: 11 }
     },
@@ -313,6 +380,7 @@ function drawChart(townMap) {
 
   Plotly.newPlot("chart", traces, layout, config).then(() => {
     chartReady = true;
+    attachPinchZoom(document.getElementById("chart"));
     document.getElementById("chart").on("plotly_click", (data) => {
       if (!data.points || !data.points.length) return;
       const name = data.points[0].customdata;
