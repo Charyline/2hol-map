@@ -8,7 +8,7 @@
 // redirects back here with #discord_user=...
 // Set this to the PUBLIC URL of your Node process (no trailing slash).
 const AUTH_SERVER_URL = "https://aaaa.prof.ninja";
-const DISCORD_GUILD_ID  = "423293333864054833";  // official 2HOL guild
+const DISCORD_GUILD_ID = "423293333864054833";  // official 2HOL guild
 // Discord experience roles (name, /slash alias, and later the snowflake id).
 // Higher number = more hours. Visibility "vet" means level >= Veteran.
 // Paste role IDs as extra keys when you have them, e.g. "123456789012345678": 3
@@ -39,14 +39,14 @@ const VIS_LABEL = {
 };
 
 const ICON_STYLES = {
-  default:   { symbol: "circle",        color: "#3b82f6", label: "Default" },
-  star:      { symbol: "star",          color: "#f59e0b", label: "Star" },
-  tree:      { symbol: "triangle-up",   color: "#22c55e", label: "Tree / Nature" },
-  tobacco:   { symbol: "diamond",       color: "#a16207", label: "Tobacco" },
-  christmas: { symbol: "star",          color: "#ef4444", label: "Christmas" },
-  event:     { symbol: "hexagon",       color: "#a855f7", label: "Event" },
-  outpost:   { symbol: "square",        color: "#64748b", label: "Road / Outpost" },
-  special:   { symbol: "diamond-wide",  color: "#ec4899", label: "Special" }
+  default: { symbol: "circle", color: "#3b82f6", label: "Default" },
+  star: { symbol: "star", color: "#f59e0b", label: "Star" },
+  tree: { symbol: "triangle-up", color: "#22c55e", label: "Tree / Nature" },
+  tobacco: { symbol: "diamond", color: "#a16207", label: "Tobacco" },
+  christmas: { symbol: "star", color: "#ef4444", label: "Christmas" },
+  event: { symbol: "hexagon", color: "#a855f7", label: "Event" },
+  outpost: { symbol: "square", color: "#64748b", label: "Road / Outpost" },
+  special: { symbol: "diamond-wide", color: "#ec4899", label: "Special" }
 };
 
 const firebaseConfig = {
@@ -296,7 +296,12 @@ function drawChart(townMap) {
       gridcolor: "#1f2937", tickfont: { size: 11 }
     },
     showlegend: true,
-    legend: { bgcolor: "rgba(26,35,50,0.8)", bordercolor: "#2d3a4f", font: { size: 11 } },
+    legend: {
+      bgcolor: "rgba(0,0,0,0)",
+      bordercolor: "#2d3a4f",
+      font: { size: 11 },
+      x: 1, y: 1, xanchor: 'right'
+    },
     hovermode: "closest", dragmode: "pan"
   };
 
@@ -359,6 +364,23 @@ function showDetail(id) {
 }
 
 // ---------- Views ----------
+function openMenu() {
+  if (!window.matchMedia("max-width: 600px")) return;
+  const nav = document.getElementById("nav");
+  const auth_area = document.getElementById("auth-area");
+  const shrink_btn = document.getElementById("shrink-button");
+  if (nav.classList.contains("shrink")) {
+    nav.classList.remove("shrink");
+    auth_area.classList.remove("shrink");
+    shrink_btn.innerHTML = "︿";
+  } else {
+    nav.classList.add("shrink");
+    auth_area.classList.add("shrink");
+    shrink_btn.innerHTML = "﹀";
+  }
+  if (document.getElementById("btn-map").classList.contains("active")) switchView("map");
+}
+
 function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -386,7 +408,7 @@ function renderTownList() {
   if (search) {
     list = list.filter(t =>
       t.name.toLowerCase().includes(search) ||
-      (t.reporters||[]).some(r => r.toLowerCase().includes(search)) ||
+      (t.reporters || []).some(r => r.toLowerCase().includes(search)) ||
       (t.ownerNames || []).some(o => o.toLowerCase().includes(search))
     );
   }
@@ -493,12 +515,12 @@ function analyzeReports(data) {
         if (o.key === r.key) return false;
         const sameMag =
           (Math.abs(Math.abs(o.x) - Math.abs(r.x)) < 50 &&
-           Math.abs(Math.abs(o.y) - Math.abs(r.y)) < 50);
+            Math.abs(Math.abs(o.y) - Math.abs(r.y)) < 50);
         if (!sameMag) return false;
         // different sign pattern
         return (o.x !== r.x || o.y !== r.y) &&
-               (Math.sign(o.x) !== Math.sign(r.x) || Math.sign(o.y) !== Math.sign(r.y) ||
-                o.x === -r.x || o.y === -r.y);
+          (Math.sign(o.x) !== Math.sign(r.x) || Math.sign(o.y) !== Math.sign(r.y) ||
+            o.x === -r.x || o.y === -r.y);
       });
       if (isMirror) flags[r.key].push("mirror");
     });
@@ -555,7 +577,7 @@ async function deleteTown(id) {
     for (const k of Object.keys(reps)) {
       const r = reps[k];
       if (!r || (r.townId !== id && r.townName !== t.name)) continue;
-      try { await reportRef.child(k).remove(); } catch (_) {}
+      try { await reportRef.child(k).remove(); } catch (_) { }
     }
   } catch (err) {
     alert("Delete failed: " + (err && err.message ? err.message : err));
@@ -636,7 +658,7 @@ function levenshtein(a, b) {
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
   return dp[m][n];
 }
 
@@ -750,7 +772,7 @@ async function handleDiscordCallback() {
     try {
       if (me.firebaseToken && firebase.auth) {
         await firebase.auth().signInWithCustomToken(me.firebaseToken);
-      } 
+      }
       const snap = await firebase.database().ref(`/discordRoles/${me.id}`).once("value");
       const stored = snap.val();
       if (stored && Array.isArray(stored.roles)) {
@@ -759,7 +781,7 @@ async function handleDiscordCallback() {
       } else if (stored && typeof stored.level === "number") {
         level = Math.max(level, stored.level);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     currentUser = {
       id: me.id,
@@ -784,7 +806,7 @@ function logout() {
   currentUser = null;
   isAdmin = false;
   localStorage.removeItem("2hol_discord");
-  if (firebase.auth) firebase.auth().signOut().catch(() => {});
+  if (firebase.auth) firebase.auth().signOut().catch(() => { });
   updateAuthUI();
   updateAdminPanel();
   processAndRender();
@@ -828,7 +850,7 @@ function applyFirebaseUser(fbUser) {
     return;
   }
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("2hol_discord") || "null"); } catch (_) {}
+  try { saved = JSON.parse(localStorage.getItem("2hol_discord") || "null"); } catch (_) { }
   if (!saved || saved.id !== fbUser.uid) {
     saved = {
       id: fbUser.uid,
@@ -852,7 +874,7 @@ function applyFirebaseUser(fbUser) {
 
 function startAuthListener() {
   if (!firebase.auth) return;
-  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => { });
   firebase.auth().onAuthStateChanged(applyFirebaseUser);
 }
 
@@ -980,6 +1002,7 @@ document.getElementById("sort-towns").addEventListener("change", renderTownList)
 document.getElementById("search-reports").addEventListener("input", renderReportsTable);
 document.getElementById("filter-problems")?.addEventListener("change", renderReportsTable);
 document.getElementById("rtown").addEventListener("input", checkNameSimilarity);
+document.getElementById("shrink-button").addEventListener("click", openMenu);
 document.getElementById("btn-login").addEventListener("click", loginWithDiscord);
 document.getElementById("btn-logout").addEventListener("click", logout);
 

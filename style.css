@@ -107,6 +107,15 @@ body {
   transition: all 0.15s;
 }
 
+#shrink-button {
+  padding: 0.2rem 0.3rem;
+  max-width: fit-content;
+}
+
+#shrink-button:hover {
+  background: transparent
+}
+
 .nav-btn:hover {
   color: var(--text);
   background: var(--surface2);
@@ -608,6 +617,10 @@ tr.flag-extreme {
   text-decoration: underline;
 }
 
+.wide-hidden {
+  display: none;
+}
+
 /* Responsive */
 @media (max-width:950px) {
   .nav {
@@ -619,15 +632,24 @@ tr.flag-extreme {
   }
 }
 
-@media (max-width: 400px) {
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+@media (max-width: 600px) {
+  .shrink {
+    display: none !important;
   }
 
   .brand {
     max-width: 100%;
+    padding-right: 0px;
+  }
+
+  .wide-hidden {
+    display: inline-block;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 
   .panel {

@@ -13,18 +13,22 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <h1><a href="https://twohoursonelife.com">2HOL Town Map</a></h1>
-      <span class="subtitle">Community bell-locator for Two Hours One Life</span>
+      <h1>
+        <a href="https://twohoursonelife.com">2HOL Town Map</a>
+        <button id="shrink-button" class="nav-btn wide-hidden" title="expand menu">﹀</button>
+      </h1>
+      <span class="subtitle">Community bell-locator for Two Hours One Life </span>
     </div>
-    <nav class="nav">
+
+    <nav id="nav" class="nav shrink">
       <button id="btn-map" class="nav-btn active" data-view="map">Map</button>
       <button id="btn-list" class="nav-btn" data-view="list">Town List</button>
       <button id="btn-my" class="nav-btn hidden" data-view="my">My Towns</button>
-      <button id="btn-report" class="nav-btn hidden" data-view="report">Report a Town</button>
+      <button id="btn-report" class="nav-btn hidden" data-view="report">Add a Town</button>
       <button id="btn-admin" class="nav-btn" data-view="admin">Admin</button>
       <!-- <a class="nav-btn discord" href="https://discord.gg/atEgxm7" target="_blank" rel="noopener">Discord</a> -->
     </nav>
-    <div id="auth-area" class="auth-area">
+    <div id="auth-area" class="auth-area shrink">
       <button id="btn-login" class="nav-btn login-btn">Login with Discord</button>
       <div id="user-menu" class="user-menu hidden">
         <img id="user-avatar" class="avatar" alt="">
@@ -193,7 +197,8 @@
           <h2>Admin Panel</h2>
           <button id="recompute-btn" class="secondary-btn">Force Recompute Map</button>
         </div>
-        <p class="hint">These are the towns on the map. Delete removes the town <strong>and</strong> its confirmation reports. Public town cannot be deleted.</p>
+        <p class="hint">These are the towns on the map. Delete removes the town <strong>and</strong> its confirmation
+          reports. Public town cannot be deleted.</p>
         <div class="admin-legend">
           <span><span class="flag-badge dup">dup</span> exact same coords already reported for this town</span>
           <span><span class="flag-badge mirror">mirror</span> looks like a sign-flip of another report</span>
@@ -286,14 +291,14 @@
   </div>
 
   <footer class="footer">
-    <span>Data open via Firebase · Built for the 2HOL community · <a href="https://discord.gg/atEgxm7"
-        target="_blank">Link to the Discord server</a></span>
+    <span>Data open via Firebase · Built for the <a href="https://discord.gg/atEgxm7" target="_blank">2HOL
+        community</a></span>
   </footer>
 
   <!-- Libraries -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>  
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <script src="./script.js"></script>
